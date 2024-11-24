@@ -8,6 +8,11 @@ CUDA_VISIBLE_DEVICES=0 sudo docker run --gpus all drive
 ```
 ## Содержимое
 В репозитории содержится код для обучения resnet18 и efficientnet и ансамбля на результатах их работы. Мы начинаем наше обучение с уже натренированных чекпоинтов, у которых меняем входной слой, чтобы он принимал 9-ти канальное изображение (конкатенация 5-ти разных проекций автомобиля). Если вы хотите поменять какие-то гиперпараметры связанные с обучением, это можно сделать с помощью config.yaml.
+## RuntimeError: DataLoader worker (pid 117) is killed by signal: Bus error.
+Чтобы исправить эту ошибку можно использовать --shm-size=1024m
+```shell
+CUDA_VISIBLE_DEVICES=0 sudo docker run --shm-size=1024m --gpus all drive
+```
 ## NVIDIA Container Toolkit
 Если при запуске docker-образа будут проблемы с видимостью gpu, то их, скорее всего, можно будет решить с помощью установки NVIDIA Container Toolkit. 
 1. Configure the repository:
