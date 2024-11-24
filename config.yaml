@@ -1,6 +1,6 @@
 resnet18:
   name: resnet18full_shape
-  num_epochs: 1
+  num_epochs: 40
 efficientnet:
   name: efficientnet_b1_full_shape
-  num_epochs: 1
+  num_epochs: 40
