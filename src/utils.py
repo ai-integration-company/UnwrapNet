@@ -22,8 +22,8 @@ def train(model, train_dataset, test_dataset, config):
     model = torch.nn.DataParallel(model)#, device_ids = [0,1])
     model = model.to(device)
 
-    train_loader = DataLoader(train_dataset, batch_size=16, num_workers=4, shuffle=True, pin_memory=False)
-    test_loader = DataLoader(test_dataset, batch_size=16, num_workers=4, shuffle=False, pin_memory=False)
+    train_loader = DataLoader(train_dataset, batch_size=150, num_workers=4, shuffle=True, pin_memory=False)
+    test_loader = DataLoader(test_dataset, batch_size=150, num_workers=4, shuffle=False, pin_memory=False)
 
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
