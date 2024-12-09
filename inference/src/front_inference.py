@@ -51,7 +51,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.markdown("<h1>AERONET</h1>", unsafe_allow_html=True)
+st.markdown("<h1>AERO DRIVE</h1>", unsafe_allow_html=True)
 st.markdown("<h2>AI Integration</h2>", unsafe_allow_html=True)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -61,13 +61,11 @@ def remove_module_prefix(state_dict):
     new_state_dict = {}
     for key, value in state_dict.items():
         if key.startswith('module.'):
-            new_key = key[len('module.'):]  # Remove 'module.' prefix
+            new_key = key[len('module.'):]
         else:
             new_key = key
         new_state_dict[new_key] = value
     return new_state_dict
-
-# Download the model EfficientNet
 
 
 def load_EfficientNet():
@@ -94,26 +92,19 @@ def load_ResNet():
 
     model = models.resnet18(pretrained=True)
 
-    # Modify the first convolutional layer to accept 6 channels
-    # Original: Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
-    # New: Conv2d(6, 64, kernel_size=7, stride=2, padding=3, bias=False)
-
-    # Get the original first conv layer
     original_conv = model.conv1
 
-    # Create a new conv layer with 6 input channels
+    # Новый вход с 9 каналами
     new_conv = nn.Conv2d(9, original_conv.out_channels, kernel_size=original_conv.kernel_size,
                          stride=original_conv.stride, padding=original_conv.padding, bias=original_conv.bias)
 
-    # Initialize the new conv layer's weights by copying the original weights and duplicating for the additional channels
     with torch.no_grad():
         new_conv.weight[:, :3, :, :] = original_conv.weight
-        new_conv.weight[:, 3:6, :, :] = original_conv.weight  # Duplicate weights for the additional channels
+        new_conv.weight[:, 3:6, :, :] = original_conv.weight
         new_conv.weight[:, 6:9, :, :] = original_conv.weight
-    # Replace the model's conv1 with the new conv layer
     model.conv1 = new_conv
 
-    # Modify the fully connected layer for regression
+    # Слой регрессии
     model.fc = nn.Linear(model.fc.in_features, 1)
 
     model.load_state_dict(checkpoint)
@@ -141,6 +132,23 @@ def run_inference(model, dataloader):
     return predictions
 
 
+def sample_points(points, n):
+    n = min(len(points), n)
+    indices = np.random.choice(len(points), size=n, replace=False)
+    sampled_points = points[indices]
+    return sampled_points
+
+
+def save_sampled_stl(points, file_path):
+    degenerate_triangles = np.array([[p, p, p] for p in points])
+    new_mesh = mesh.Mesh(np.zeros(degenerate_triangles.shape[0], dtype=mesh.Mesh.dtype))
+    for i, triangle in enumerate(degenerate_triangles):
+        new_mesh.v0[i] = triangle[0]
+        new_mesh.v1[i] = triangle[1]
+        new_mesh.v2[i] = triangle[2]
+    new_mesh.save(file_path)
+
+
 @st.cache_resource(show_spinner=False)
 def handle_stl_file(stl_file):
     """Handles saving the STL file, generating projections, and preparing paths."""
@@ -152,20 +160,26 @@ def handle_stl_file(stl_file):
 
     file_path = os.path.join(input_dir, stl_file.name)
 
-    # Save uploaded file
     with open(file_path, "wb") as f:
         f.write(stl_file.getbuffer())
 
-    # Load STL file and save it back (if needed for further use)
     stl_mesh = mesh.Mesh.from_file(file_path)
-    stl_mesh.save(file_path)
 
-    # Generate projections
+    total_vertices = len(stl_mesh.v0) + len(stl_mesh.v1) + len(stl_mesh.v2)
+    if total_vertices > 1_000_000:
+        st.warning(f"Large STL file detected with {total_vertices} vertices. Sampling 200,000 points.")
+        points = np.vstack([stl_mesh.v0, stl_mesh.v1, stl_mesh.v2])
+        sampled_points = sample_points(points, 200_000)
+        sampled_file_path = os.path.join(input_dir, f"sampled_{stl_file.name}")
+        save_sampled_stl(sampled_points, sampled_file_path)
+        st.success(f"Sampled STL file saved at {sampled_file_path}")
+        file_path = sampled_file_path
+    else:
+        stl_mesh.save(file_path)
 
     subprocess.run(["./mesh_projection_mt", input_dir, output_dir, '3'], capture_output=True)
     st.success('Projections generated!')
 
-    # Return the path to projections
     return os.path.join(output_dir, stl_file.name[:-4])
 
 
@@ -199,16 +213,29 @@ def preprocess_images(grayscale_images, rgb_images):
 def get_img():
     img_path = 'images'
     img_path = os.path.join(img_path, stl_file.name[:-4])
-    images = []
 
-    for img in glob.glob(img_path + '/*.png'):
-        if 'spherical' in img or 'cylinder' in img:
-            images.append(Image.open(img).convert('RGB'))
-        elif 'up' in img or 'left' in img or 'front' in img:
-            images.append(Image.open(img).convert('L'))
-        else:
-            continue
-    return images
+    # Порядок слоев
+    ordered_files = [
+        "spherical_projection.png",
+        "cylinder_projection.png",
+        "left_projection.png",
+        "front_projection.png",
+        "up_projection.png",
+    ]
+
+    images = []
+    img_paths = []
+
+    for file_name in ordered_files:
+        file_path = os.path.join(img_path, file_name)
+        if os.path.exists(file_path):
+            if "spherical" in file_name or "cylinder" in file_name:
+                images.append(Image.open(file_path).convert('RGB'))
+            elif "up" in file_name or "left" in file_name or "front" in file_name:
+                images.append(Image.open(file_path).convert('L'))
+            img_paths.append(file_path)
+
+    return images, img_paths
 
 
 @st.cache_resource(show_spinner=False)
@@ -255,7 +282,9 @@ if stl_file is not None:
         with columns[i]:
             st.image(img, use_container_width=True)
 
-    images = get_img()
+    images, img_paths = get_img()
+
+    # st.write(f"{img_paths}")
 
     image_transforms = transforms.Compose([
         transforms.Resize((256, 256)),

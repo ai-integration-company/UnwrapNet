@@ -1,4 +1,4 @@
-# Train Drive
+# Train Aero Drive
 
 ## Запуск
 Этот подрепозиторий содержит все файлы необходимые для воспроизведения наших экспериментов. Если Вы хотите проверить наши результаты, то можно просто выполнить следующую последовательность команд:
@@ -13,6 +13,7 @@ CUDA_VISIBLE_DEVICES=0 sudo docker run --gpus all drive
 ```shell
 CUDA_VISIBLE_DEVICES=0 sudo docker run --shm-size=1024m --gpus all drive
 ```
+Если ошибка продолжает возникать, то можно попробовать ещё увеличить количество shared memory, например --shm-size=2048m.
 ## NVIDIA Container Toolkit
 Если при запуске docker-образа будут проблемы с видимостью gpu, то их, скорее всего, можно будет решить с помощью установки NVIDIA Container Toolkit. 
 1. Configure the repository:
