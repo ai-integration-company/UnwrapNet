@@ -1,55 +1,61 @@
-# Aero Drive
+# UnwrapNet
 
-Решение команды **AI integration** трека 3 Расчет аэро- и газодинамики в ограниченном пространстве с использованием искусственного интеллекта.
+Code for paper UnwrapNet: A Novel Approach To Proceed 3D Objects.
 
-Этот репозиторий содержит все файлы, необходимые для воспроизведения наших экспериментов и работы итогового продукта. Если Вы хотите проверить эксперимент, то перейдите в папку **train** и следуйте инструкции. Если же хотите запустить продукт с обученными моделями, то перейдите в папку **inference** и следуйте инструкции.
-
-**Результат на валидации: 0.0153**
+This repository contains all files necessary to reproduce our experiments and run the product.  
+If you want to **reproduce the experiment**, go to the **train** folder and follow the instructions.  
+If you want to **run the product with trained models**, go to the **inference** folder and follow the instructions.
 
 ---
 
-## Описание решения
+## Solution Description
 
-Мы используем 3D модели машин для генерации 5 изображений:  
-1. **3 grayscale проекции** с разных сторон, где значение точки определяется как расстояние до проекционной плоскости.  
-2. **Сферическая и цилиндрическая RGB развёртка модели.**
+We use 3D car models to generate 5 images:
 
-Все затратные вычисления реализованы на многопоточном коде на языке C++, что обеспечивает невероятную скорость генерации изображений по 3D модели (1000 моделей за 1 минуту).
+1. **Three grayscale projections** from different sides, where each pixel value represents the distance to the projection plane.  
+2. **Spherical and cylindrical RGB unwrapped projections** of the model.
 
-Примеры сгенерированных изображений:  
+All computationally expensive operations are implemented in multithreaded **C++ code**, enabling extremely fast image generation from 3D models (1000 models per minute).
 
-### Grayscale проекции
+Examples of generated images:
+
+### Grayscale Projections
 <div style="display: flex; justify-content: center;">
   <img src="img/up_projection.png" alt="up Projection" width="20%">
   <img src="img/left_projection.png" alt="left Projection" width="20%">
   <img src="img/front_projection.png" alt="front Projection" width="20%">
 </div>
 
-### RGB развёртки
+### RGB Unwrapped Projections
 <div style="display: flex; justify-content: center;">
   <img src="img/spherical_projection.png" alt="Spherical Projection" width="20%">
   <img src="img/cylinder_projection.png" alt="Cylindrical Projection" width="20%">
 </div>
 
-
 ---
 
-Мы обучили на этих данных две предобученные модели с измененными первым слоем с 9 каналами на вход(3 канала grayscale проекций, 3 RGB сферической проекции, 3 RGB цилиндрической проекции) и последним слоем с 1 выходом:  
-- **ResNet18**  
-- **EfficientNetB1**  
+We trained two pretrained models on this data, modifying:
+- the first layer to accept **9 channels** as input (3 grayscale + 3 RGB spherical + 3 RGB cylindrical)
+- the final layer to output a single value:
 
-Обе модели используются для предсказания коэффициента аэродинамического сопротивления. После этого был обучен ансамбль лёгковесных моделей на выходах двух нейросетей. Этот подход позволяет гибко балансировать между качеством и скоростью работы алгоритма.  
+- **ResNet18**
+- **EfficientNetB1**
 
-- **Для быстроты** используйте **EfficientNet**.  
-- **Для высокого качества** используйте весь пайплайн, который мы назвали **AERONET**.
+Both models are used to predict the aerodynamic drag coefficient.  
+We then trained a lightweight ensemble model on the outputs of these two networks.  
+This approach provides a **flexible trade-off between speed and accuracy**.
 
-## Предподготовка данных
+- Use **EfficientNet** for **speed**.  
+- Use the full pipeline, which we named **UnwrapNet**, for **accuracy**.
 
-В подрепозитории train уже скачиваются предобработанные данные в виде 5 картинок на одну модель. Для того, чтобы получить из 3д модели данные подходящие для обучения и инференса самостоятельно необходимо сделать следующее:
+## Data Preprocessing
 
-1. Скачать 3д модели в формате .stl в папку stl_dir
-2. Если в моделях больше 100_000 точек, то следует выбрать случайные 100_000 точек. 
-3. Установить необходимые зависимости для компиляции кода на c++: 
+In the `train` subdirectory, preprocessed data (5 images per model) are downloaded automatically.  
+To generate training/inference-ready data from 3D models manually:
+
+1. Download `.stl` models into the `stl_dir` directory.
+2. If a model contains more than **100,000 points**, randomly sample **100,000** points.
+3. Install the required dependencies for compiling the C++ code:
 ```bash
 apt-get update && apt-get install -y \
     build-essential \
@@ -60,7 +66,7 @@ apt-get update && apt-get install -y \
     cmake \
     && apt-get clean
 ```
-4. Скачать и скомпилировать файл **inference/src/mesh_projection_mt.cpp**:
+4. Download and compile the file `inference/src/mesh_projection_mt.cpp`:
 ```bash
 g++ -std=c++17 -O2 -o mesh_projection_mt mesh_projection_mt.cpp \
     -I/usr/include/opencv4 \
@@ -72,12 +78,11 @@ g++ -std=c++17 -O2 -o mesh_projection_mt mesh_projection_mt.cpp \
     -lassimp \
     -pthread
 ```
-5. Сделать директорию img_dir и выдать все необходимые права.
+5. Create the `img_dir` directory and give full permissions:
 ```bash
 mkdir img_dir
 chmod 777 img_dir
 ```
-6. Исполнить скомпилированный файл с необходимыми аргументами:
+6. Run the compiled file with the necessary arguments:
 ```bash
 ./mesh_projection_mt stl_dir img_dir 3
-```
